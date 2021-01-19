@@ -8,7 +8,7 @@ from kivymd.uix.card import MDCard
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.toolbar import MDToolbar
 from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget
-from kivy.uix.widget import Widget
+from kivymd.toast import toast
 
 Window.size = (360, 600)
 Window.keyboard_anim_args = {'d': 0.2, 't': 'in_out_expo'}
@@ -22,6 +22,8 @@ db_cafe = mysql.connector.connect(host="bpjum1fu8uithbn7fk2n-mysql.services.clev
 
 username_current = ""
 hotel_selected = ""
+
+
 # result = []
 
 
@@ -61,6 +63,10 @@ class TopToolbar(MDToolbar):
 
 class HotelScreen(Screen):
     global db_cafe
+    dish_ordering_list = list()
+
+    def on_enter(self):
+        toast(text="Welcome!")
 
     def on_pre_enter(self):
         self.cursor = db_cafe.cursor()
@@ -75,29 +81,43 @@ class HotelScreen(Screen):
         self.cursor.execute(search)
         dish_available = pd.DataFrame(self.cursor.fetchall()).rename(columns={0: "Dish", 1: "Price"})
         for i in range(len(dish_available)):
-            l = IconLeftWidget(icon = "minus", on_release = self.minus_dish)
-            r = IconRightWidget(icon="plus", on_release = self.plus_dish)
-            dish_toShow = TwoLineAvatarIconListItem(text = dish_available.loc[i,"Dish"], secondary_text = str(dish_available.loc[i,"Price"]))
+            l = IconLeftWidget(icon="minus", on_release=self.minus_dish)
+            r = IconRightWidget(icon="plus", on_release=self.plus_dish)
+            dish_toShow = TwoLineAvatarIconListItem(text=dish_available.loc[i, "Dish"],
+                                                    secondary_text=str(dish_available.loc[i, "Price"]))
             dish_toShow.add_widget(l)
             dish_toShow.add_widget(r)
             self.ids.list_dish.add_widget(dish_toShow)
 
     def minus_dish(self, instance):
         dish_clicked_toMinus = [widget for widget in instance.walk_reverse()][5]
-        print(dish_clicked_toMinus.text)
+        # print(dish_clicked_toMinus.text)
+        try:
+            self.dish_ordering_list.remove(dish_clicked_toMinus.text)
+            Snackbar(text=dish_clicked_toMinus.text + " has been removed from cart").show()
+        except ValueError:
+            pass
 
     def plus_dish(self, instance):
         dish_clicked_toPlus = [widget for widget in instance.walk_reverse()][8]
-        print(dish_clicked_toPlus.text)
+        # print(dish_clicked_toPlus.text)
+        self.dish_ordering_list.append(dish_clicked_toPlus.text)
+        Snackbar(text=dish_clicked_toPlus.text + " has been added to cart").show()
         # dish_clicked = [widget for widget in instance.walk_reverse()][8]
         # print(dish_clicked)
         # print(dish_clicked.text)
         # print([type(widget) for widget in instance.walk_reverse()])
         # print(dir(instance))
 
+    def verifyOrders_bottom(self):
+        orders__frequency_table = {i: self.dish_ordering_list.count(i) for i in self.dish_ordering_list}
+        print(orders__frequency_table)
+
+
 class studentApp(MDApp):
     def build(self):
         self.theme_cls.primary_palette = 'BlueGray'
+
 
 if __name__ == "__main__":
     studentApp().run()

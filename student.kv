@@ -6,7 +6,6 @@ ScreenManager:
 
 <LogInScreen>:
     name: "logIn"
-    on_leave: self.getUsername()
     MDScreen:
         md_bg_color: [1,1,51/255.0,0.6]
         #md_bg_color: [0,0,1,0.7]
@@ -90,3 +89,10 @@ ScreenManager:
         ScrollView:
             MDList:
                 id: list_dish
+
+    MDFloatingActionButton:
+        icon: 'check'
+        md_bg_color: app.theme_cls.primary_color
+        on_release: root.verifyOrders_bottom()
+        pos_hint: {'center_x': 0.85, 'center_y': 0.1}
+
