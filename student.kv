@@ -90,9 +90,19 @@ ScreenManager:
             MDList:
                 id: list_dish
 
-    MDFloatingActionButton:
-        icon: 'check'
-        md_bg_color: app.theme_cls.primary_color
-        on_release: root.verifyOrders_bottom()
-        pos_hint: {'center_x': 0.85, 'center_y': 0.1}
+    #MDFloatingActionButton:
+     #   icon: 'check'
+      #  md_bg_color: app.theme_cls.primary_color
+       # on_release: root.verifyOrders_bottom()
+        #pos_hint: {'center_x': 0.85, 'center_y': 0.1}
 
+
+    MDBottomAppBar:
+        MDToolbar:
+            id: bottomToolbar
+            title: ""
+            icon: "arrow-right"
+            type: "bottom"
+            #left_action_items: [["menu", lambda x: x]]
+            mode: "end"
+            on_action_button: root.verifyOrders_bottom()
