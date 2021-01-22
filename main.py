@@ -1,32 +1,32 @@
 import mysql.connector
+import pandas as pd
+from datetime import date
+from random import randint
+from datetime import datetime
 from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager, Screen
-import pandas as pd
 from kivy.core.window import Window
 from kivymd.uix.behaviors.magic_behavior import MagicBehavior
 from kivymd.uix.card import MDCard
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.toolbar import MDToolbar
-from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget
+from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget, TwoLineListItem
 from kivymd.toast import toast
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
+from kivymd.uix.label import MDLabel
+from kivymd.uix.gridlayout import MDGridLayout
+from kivy.base import EventLoop
+from kivymd.uix.picker import MDTimePicker
 
 Window.size = (360, 600)
 Window.keyboard_anim_args = {'d': 0.2, 't': 'in_out_expo'}
 Window.softinput_mode = 'below_target'
 
-db = mysql.connector.connect(host="brpg5m1l8xcv2q8nabt8-mysql.services.clever-cloud.com", user="ulqlzxo7wrajkyrh",
-                             passwd="Jbaa6icE4fSvBqASU5hm", database="brpg5m1l8xcv2q8nabt8")
-
-db_cafe = mysql.connector.connect(host="bpjum1fu8uithbn7fk2n-mysql.services.clever-cloud.com", user="utt8pcxyfysh9vwz",
+db = mysql.connector.connect(host="bpjum1fu8uithbn7fk2n-mysql.services.clever-cloud.com", user="utt8pcxyfysh9vwz",
                                   passwd="fFYduFGCjwhnyLrc1hIy", database="bpjum1fu8uithbn7fk2n")
 
 username_current = ""
-hotel_selected = ""
-
-
-# result = []
 
 
 class ScreenManagement(ScreenManager):
@@ -40,12 +40,9 @@ class AnimCard(MagicBehavior, MDCard):
 class LogInScreen(Screen):
     def on_pre_enter(self):
         local_cursor = db.cursor()
-        local_cursor.execute("select * from login")
+        local_cursor.execute("select * from loginStudent")
         self.result = local_cursor.fetchall()
 
-    def getUsername(self):
-        global username_current
-        username_current = self.ids.username.text
 
     def logIn_verify(self):
         if (self.ids.username.text, self.ids.password.text) in self.result:
@@ -57,6 +54,12 @@ class LogInScreen(Screen):
             Snackbar(text='Verify your credentials').show()
             return 0
 
+    def on_leave(self):
+        global username_current
+
+        username_current = self.ids.username.text
+        toast(text="Welcome!")
+
 
 class TopToolbar(MDToolbar):
     def logOut(self):
@@ -64,32 +67,40 @@ class TopToolbar(MDToolbar):
 
 
 class HotelScreen(Screen):
-    global db_cafe
-    dish_ordering_list = list()
+    global db
+
+    student_ordering_list = list()
     dishCount_Order = 0
     totalAmount_Order = 0
-    cafe_ordering_currently = ""
-
-    def on_enter(self):
-        toast(text="Welcome!")
+    hotel_ordering_currently = ""
+    dish_available_in_currentSelectedHotel = pd.DataFrame()
+    bottomAppID = ""
 
     def on_pre_enter(self):
-        self.cursor = db_cafe.cursor()
+
+        HotelScreen.bottomAppID = self.ids.bottomToolbar
+        # print(HotelScreen.bottomAppID)
+        self.cursor = db.cursor()
         search = "select distinct username from dish"
         self.cursor.execute(search)
-        self.hotel_name = list(pd.DataFrame(self.cursor.fetchall())[0])
-        self.ids.hotelNames_spinner.values = self.hotel_name
+        self.hotel_names_spinner = list(pd.DataFrame(self.cursor.fetchall())[0])
+        self.ids.hotelNames_spinner.values = self.hotel_names_spinner
+        # self.ids.bottomToolbar.title = ""
 
     def dish_filler(self, hotel_selected):
+        # print(dir(self.ids.list_dish))
+        # print("Children before :\t", self.ids.list_dish.children)
         self.ids.list_dish.clear_widgets()
+        # print("Children after :\t", self.ids.list_dish.children)
+        # print(dir(self.ids.list_dish))
         search = "select dish, price from dish where username = \"" + hotel_selected + "\" and available = 1"
         self.cursor.execute(search)
-        self.dish_available = pd.DataFrame(self.cursor.fetchall()).rename(columns={0: "Dish", 1: "Price"})
-        for i in range(len(self.dish_available)):
+        HotelScreen.dish_available_in_currentSelectedHotel = pd.DataFrame(self.cursor.fetchall()).rename(columns={0: "Dish", 1: "Price"})
+        for i in range(len(HotelScreen.dish_available_in_currentSelectedHotel)):
             l = IconLeftWidget(icon="minus", on_release=self.minus_dish)
             r = IconRightWidget(icon="plus", on_release=self.plus_dish)
-            dish_toShow = TwoLineAvatarIconListItem(text=self.dish_available.loc[i, "Dish"],
-                                                    secondary_text=str(self.dish_available.loc[i, "Price"]))
+            dish_toShow = TwoLineAvatarIconListItem(text=HotelScreen.dish_available_in_currentSelectedHotel.loc[i, "Dish"],
+                                                    secondary_text=str(HotelScreen.dish_available_in_currentSelectedHotel.loc[i, "Price"]))
             dish_toShow.add_widget(l)
             dish_toShow.add_widget(r)
             self.ids.list_dish.add_widget(dish_toShow)
@@ -97,34 +108,34 @@ class HotelScreen(Screen):
     def minus_dish(self, instance):
         dish_clicked_toMinus = [widget for widget in instance.walk_reverse()][5]
         try:
-            self.dish_ordering_list.remove(dish_clicked_toMinus.text)
+            HotelScreen.student_ordering_list.remove(dish_clicked_toMinus.text)
             # Snackbar(text=dish_clicked_toMinus.text + " has been removed from cart").show()
-            # print(dish_clicked_toMinus.text,int(self.dish_available.query('Dish == @dish_clicked_toMinus.text')['Price']))
-            self.dishCount_Order -= 1
-            self.totalAmount_Order -= int(self.dish_available.query('Dish == @dish_clicked_toMinus.text')['Price'])
-            # print(self.dishCount_Order, self.totalAmount_Order)
-            self.ids.bottomToolbar.title = str(self.dishCount_Order) + " items | \u20B9" + str(self.totalAmount_Order)
+            # print(dish_clicked_toMinus.text,int(HotelScreen.dish_available_in_currentSelectedHotel.query('Dish == @dish_clicked_toMinus.text')['Price']))
+            HotelScreen.dishCount_Order -= 1
+            HotelScreen.totalAmount_Order -= int(HotelScreen.dish_available_in_currentSelectedHotel.query('Dish == @dish_clicked_toMinus.text')['Price'])
+            # print(HotelScreen.dishCount_Order, HotelScreen.totalAmount_Order)
+            self.ids.bottomToolbar.title = str(HotelScreen.dishCount_Order) + " items | \u20B9" + str(HotelScreen.totalAmount_Order)
 
         except ValueError:
             pass
 
     def plus_dish(self, instance):
-        self.cafe_ordering_currently = self.ids.hotelNames_spinner.text if self.cafe_ordering_currently == "" else self.cafe_ordering_currently
-        # print(self.cafe_ordering_currently, self.ids.hotelNames_spinner.text)
-        if self.cafe_ordering_currently == self.ids.hotelNames_spinner.text:
+        HotelScreen.hotel_ordering_currently = self.ids.hotelNames_spinner.text if HotelScreen.hotel_ordering_currently == "" else HotelScreen.hotel_ordering_currently
+        # print(HotelScreen.hotel_ordering_currently, self.ids.hotelNames_spinner.text)
+        if HotelScreen.hotel_ordering_currently == self.ids.hotelNames_spinner.text:
             dish_clicked_toPlus = [widget for widget in instance.walk_reverse()][8]
-            self.dish_ordering_list.append(dish_clicked_toPlus.text)
+            HotelScreen.student_ordering_list.append(dish_clicked_toPlus.text)
             # Snackbar(text=dish_clicked_toPlus.text + " has been added to cart").show()
-            # print(dish_clicked_toPlus.text, int(self.dish_available.query('Dish == @dish_clicked_toPlus.text')['Price']))
-            self.dishCount_Order += 1
-            self.totalAmount_Order += int(self.dish_available.query('Dish == @dish_clicked_toPlus.text')['Price'])
-            # print(self.dishCount_Order, self.totalAmount_Order)
-            self.ids.bottomToolbar.title = str(self.dishCount_Order) + " items | \u20B9" + str(self.totalAmount_Order)
+            # print(dish_clicked_toPlus.text, int(HotelScreen.dish_available_in_currentSelectedHotel.query('Dish == @dish_clicked_toPlus.text')['Price']))
+            HotelScreen.dishCount_Order += 1
+            HotelScreen.totalAmount_Order += int(HotelScreen.dish_available_in_currentSelectedHotel.query('Dish == @dish_clicked_toPlus.text')['Price'])
+            # print(HotelScreen.dishCount_Order, HotelScreen.totalAmount_Order)
+            self.ids.bottomToolbar.title = str(HotelScreen.dishCount_Order) + " items | \u20B9" + str(HotelScreen.totalAmount_Order)
 
         else:
             self.dialog = MDDialog(
                 title="Replace cart item?",
-                text="Your cart has items from " + self.cafe_ordering_currently + ". Do you wish to replace it?",
+                text="Your cart has items from " + HotelScreen.hotel_ordering_currently + ". Do you wish to replace it?",
                 buttons=[
                     MDFlatButton(text="NO", on_release=self.dialogResponse),
                     MDFlatButton(text="YES", on_release=self.dialogResponse),
@@ -135,23 +146,121 @@ class HotelScreen(Screen):
 
     def dialogResponse(self, responseVal):
         if responseVal.text == "YES":
-            self.dish_ordering_list = list()
-            self.dishCount_Order = 0
-            self.totalAmount_Order = 0
-            self.cafe_ordering_currently = ""
+            HotelScreen.student_ordering_list = list()
+            HotelScreen.dishCount_Order = 0
+            HotelScreen.totalAmount_Order = 0
+            HotelScreen.hotel_ordering_currently = ""
             self.ids.bottomToolbar.title = ""
             self.dialog.dismiss()
         else:
             self.dialog.dismiss()
 
-    def verifyOrders_bottom(self):
-        orders__frequency_table = {i: self.dish_ordering_list.count(i) for i in self.dish_ordering_list}
-        print(orders__frequency_table)
+    def proceed_to_bill(self):
+        if self.ids.bottomToolbar.title != "":
+            MDApp.get_running_app().root.current = "bill"
+
+    def resetValues(self):
+        HotelScreen.student_ordering_list = list()
+        HotelScreen.dishCount_Order = 0
+        HotelScreen.totalAmount_Order = 0
+        HotelScreen.hotel_ordering_currently = ""
+        self.dish_available_in_currentSelectedHotel = pd.DataFrame()
+        # print(self.ids.hotelNames_spinner.text, self.ids.bottomToolbar.title, self.ids.bottomToolbar)
+        # print(MDApp.get_running_app())
+        # print(dir(MDApp.get_running_app()))
+        # print("reset: ", HotelScreen.bottomAppID)
+        HotelScreen.bottomAppID.title = ""
+
+
+class BillScreen(Screen):
+    global username_current
+
+
+    def on_enter(self):
+        self.hotel_obj = HotelScreen()
+        # self.time_takeAway = None
+        self.orders_frequency_table = None
+        self.cursor = db.cursor()
+        self.ids.bill_hotelName.text = str(self.hotel_obj.hotel_ordering_currently).upper()
+        # print(self.hotel_obj.hotel_ordering_currently, self.hotel_obj.student_ordering_list, self.hotel_obj.dish_available_in_currentSelectedHotel)
+        self.orders_frequency_table = {i: self.hotel_obj.student_ordering_list.count(i) for i in self.hotel_obj.student_ordering_list}
+        # print(self.orders_frequency_table)
+        self.ids.toBill_ScrollView.clear_widgets()
+        for i in self.orders_frequency_table:
+            grid_for_bill_card = MDGridLayout(cols=2, adaptive_height = True)
+            # print(i, self.orders_frequency_table[i])
+            # print(self.hotel_obj.dish_available_in_currentSelectedHotel)
+            # print(int(self.hotel_obj.dish_available_in_currentSelectedHotel.query('Dish == @i')['Price']))
+            # dish_price_toOrder = TwoLineListItem(text=i,secondary_text=str(HotelScreen.dish_available_in_currentSelectedHotel.loc[i, "Price"]))
+            # dish_quantity_toOrder = MDLabel(text = str(int(self.hotel_obj.dish_available_in_currentSelectedHotel.query('Dish == @i')['Price'])))
+            billDishName_details = TwoLineListItem(text = str(i), secondary_text = "QTY - " + str(self.orders_frequency_table[i]))
+            billDishPrice_details = MDLabel(text = str(int(self.hotel_obj.dish_available_in_currentSelectedHotel.query('Dish == @i')['Price']) * self.orders_frequency_table[i]), halign = 'center')
+            # self.ids.billDishName_details_id.text = str(i)
+            # self.ids.billDishName_details_id.secondary_text = "QTY - " + str(self.orders_frequency_table[i])
+            # self.ids.billDishPrice_details_id.text = str(int(self.hotel_obj.dish_available_in_currentSelectedHotel.query('Dish == @i')['Price']) * self.orders_frequency_table[i])
+            # self.ids.billDishPrice_scrollView.add_widget(billDishPrice_details)
+            # self.ids.billDishPrice_scrollView.add_widget(billDishPrice_details)
+            grid_for_bill_card.add_widget(billDishName_details)
+            grid_for_bill_card.add_widget(billDishPrice_details)
+            self.ids.toBill_ScrollView.add_widget(grid_for_bill_card)
+        self.ids.billTotalAmountToPay_id.text = "\u20B9 " + str(self.hotel_obj.totalAmount_Order)
+        # print("text = ", self.ids.billTotalAmountToPay_id.text)
+        # print(self.hotel_obj.totalAmount_Order)
+
+    def show_time_picker(self):
+        # previous_time = datetime.now().time()
+        time_dialog = MDTimePicker()
+        time_dialog.bind(time=self.get_timeFromPicker)
+        time_dialog.set_time(datetime.now().time())
+        time_dialog.open()
+
+    def get_timeFromPicker(self, instance, time):
+        self.time_takeAway = time
+        self.ids.bill_timeLbl.text = str(time)
+        self.ids.billConfirmBtn.disabled = False
+
+    def placeOrder(self):
+        # print(username_current)
+        # print(self.hotel_obj.hotel_ordering_currently)
+        # print(datetime.combine(date.today(), self.time_takeAway))
+        # print(self.orders_frequency_table)
+        orderNum = str(randint(0,99999)) + str(date.today().year) + str(date.today().month) + str(date.today().day)
+        # print(orderNum)
+        placeOrderStatement = "insert into orderDetailsTimeTable(ordernum, studentUsername, hotelName, timeTakeAway, totalPay, orderStatus) values (%s, %s, %s, %s, %s, %s)"
+        placeOrderDetails = (orderNum, username_current, self.hotel_obj.hotel_ordering_currently, datetime.combine(date.today(), self.time_takeAway), self.hotel_obj.totalAmount_Order, True)
+        self.cursor.execute(placeOrderStatement, placeOrderDetails)
+
+        placeOrderDishTableDetails = []
+        for i in self.orders_frequency_table:
+            placeOrderDishTableDetails.extend([orderNum, i, self.orders_frequency_table[i]])
+        # print(placeOrderDishTableDetails)
+
+        placeOrderDishTableStatement = "insert into orderDishTable(ordernum, dish, quantity) values " + ",".join("(%s, %s, %s)" for dummy in self.orders_frequency_table)
+        # print(placeOrderDishTableStatement)
+        self.cursor.execute(placeOrderDishTableStatement, placeOrderDishTableDetails)
+        db.commit()
+        self.ids.bill_timeLbl.text = "00:00"
+        self.ids.billConfirmBtn.disabled = True
+        self.hotel_obj.resetValues()
+        MDApp.get_running_app().root.current = 'hotel'
+        Snackbar(text='Order placed').show()
 
 
 class studentApp(MDApp):
+    global username_current
     def build(self):
         self.theme_cls.primary_palette = 'BlueGray'
+        EventLoop.window.bind(on_keyboard = self.hook_keyboard)
+
+    def hook_keyboard(self, window, key, *largs):
+        if key == 27:
+            if MDApp.get_running_app().root.current == 'hotel':
+                MDApp.get_running_app().root.current = 'logIn'
+            elif MDApp.get_running_app().root.current == 'logIn':
+                MDApp.get_running_app().stop()
+            else:
+                MDApp.get_running_app().root.current = 'hotel'
+            return True
 
 
 if __name__ == "__main__":

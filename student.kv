@@ -3,6 +3,8 @@ ScreenManager:
         name: "logIn"
     HotelScreen:
         name: "hotel"
+    BillScreen:
+        name: "bill"
 
 <LogInScreen>:
     name: "logIn"
@@ -30,9 +32,8 @@ ScreenManager:
             pos_hint:{'center_x': 0.5, 'center_y': 0.4}
             size_hint:(0.9, 0.45)
             GridLayout:
-                rows: 3
+                rows: 4
                 padding: 25
-                spacing: 20
                 MDTextField:
                     id: username
                     hint_text: "Username"
@@ -41,7 +42,7 @@ ScreenManager:
                     required: True
                     icon_right: 'account'
                     multiline: False
-                    size_hint_x: 0.8
+                    size_hint: (0.8, 0.3)
                     pos_hint: {'center_x': 0.5, 'center_y':0.9}
                 MDTextField:
                     id: password
@@ -51,15 +52,17 @@ ScreenManager:
                     icon_right: 'eye-off'
                     password: True
                     required: True
-                    size_hint_x: 0.8
+                    size_hint: (0.8, 0.3)
                     pos_hint: {'center_x': 0.5, 'center_y':0.5}
-
+                MDLabel:
+                    text: ""
+                    size_hint: (0.8, 0.15)
                 MDFillRoundFlatIconButton:
                     id: submit
                     text: 'Log In'
                     icon: 'check'
                     pos_hint: {'center_x': 0.5, 'center_y': 0.1}
-                    size_hint: (0.8, 0.2)
+                    size_hint: (0.8, 0.25)
                     md_bg_color: (128/255.0,128/255.0,1/255.0,1)
                     text_color: (0,0,0,1)
                     on_release: root.logIn_verify()
@@ -67,6 +70,7 @@ ScreenManager:
 <TopToolbar>:
     id: top_Toolbar
     right_action_items: [['power', lambda x: root.logOut()]]
+    left_action_items: [['menu', lambda x: print("DUMMY")]]
     elevation: 10
 
 <HotelScreen>:
@@ -90,19 +94,79 @@ ScreenManager:
             MDList:
                 id: list_dish
 
-    #MDFloatingActionButton:
-     #   icon: 'check'
-      #  md_bg_color: app.theme_cls.primary_color
-       # on_release: root.verifyOrders_bottom()
-        #pos_hint: {'center_x': 0.85, 'center_y': 0.1}
-
-
     MDBottomAppBar:
         MDToolbar:
             id: bottomToolbar
-            title: ""
             icon: "arrow-right"
             type: "bottom"
             #left_action_items: [["menu", lambda x: x]]
             mode: "end"
-            on_action_button: root.verifyOrders_bottom()
+            on_action_button: root.proceed_to_bill()
+
+<BillScreen>:
+    TopToolbar:
+        pos_hint: {'top': 1}
+
+    BoxLayout:
+        padding: 15
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5, 'center_y': 0.825}
+        MDIcon:
+            icon: 'food'
+            font_size: '75sp'
+
+        MDLabel:
+            id: bill_hotelName
+            font_style: 'H6'
+
+    MDCard:
+        orientation: 'vertical'
+        #padding:'8sp'
+        pos_hint:{'center_x': 0.5, 'top': 0.75}
+        size_hint:(0.9, 0.4)
+
+        ScrollView:
+            MDList:
+                id: toBill_ScrollView
+                #GridLayout:
+                 #   cols: 2
+                  #  id: billDishPrice_scrollView
+                    #TwoLineListItem:
+                    #    id: billDishName_details_id
+                    #    #divider: 'Inset'
+                    #MDLabel:
+                    #    id: billDishPrice_details_id
+                    #    halign: 'center'
+
+    GridLayout:
+        cols:2
+        padding: 15
+        size_hint: (0.9, 0.2)
+        pos_hint: {'center_x': 0.5, 'top': 0.35}
+        MDLabel:
+            text: "To Pay"
+
+        MDLabel:
+            id: billTotalAmountToPay_id
+            halign: 'center'
+
+        MDLabel:
+            text: "Pick up dish at"
+
+        MDLabel:
+            id: bill_timeLbl
+            text: "00:00"
+            halign: 'center'
+
+        MDTextButton:
+            text: "Set Time"
+            on_release: root.show_time_picker()
+
+    MDFillRoundFlatButton:
+        id: billConfirmBtn
+        text: 'Confirm order'
+        md_bg_color: (0,0.75,0.25,1)
+        size_hint_x: 1.25
+        pos_hint: {'center_x': 0.5}
+        on_release: root.placeOrder()
+        disabled: True
