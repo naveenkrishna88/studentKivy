@@ -1,10 +1,48 @@
-ScreenManager:
-    LogInScreen:
-        name: "logIn"
-    HotelScreen:
-        name: "hotel"
-    BillScreen:
-        name: "bill"
+Screen:
+    NavigationLayout:
+        ScreenManager:
+            id: master
+            LogInScreen:
+                name: "logIn"
+            HotelScreen:
+                name: "hotel"
+            BillScreen:
+                name: "bill"
+            previousOrderScreen:
+                name: "history"
+
+        NavDrawer:
+            id: nav_drawer
+            swipe_edge_width: 0
+            BoxLayout:
+                orientation: 'vertical'
+                MDLabel:
+                    id: navDrawLbl
+                    font_style: 'H4'
+                MDIcon:
+                    icon: 'fruit-cherries'
+                    font_size: '75sp'
+                    halign: 'center'
+                ScrollView:
+                    MDList:
+                        OneLineAvatarIconListItem:
+                            text: "Home"
+                            on_release: root.ids.nav_drawer.goToHome()
+                            IconLeftWidget:
+                                icon: 'home'
+
+                        OneLineAvatarIconListItem:
+                            text: "Orders"
+                            on_release: root.ids.master.current = "history"
+                            IconLeftWidget:
+                                icon: 'history'
+
+                        OneLineAvatarIconListItem:
+                            text: "LogOut"
+                            on_release: root.ids.nav_drawer.logOut()
+                            IconLeftWidget:
+                                icon: 'power'
+
 
 <LogInScreen>:
     name: "logIn"
@@ -69,9 +107,23 @@ ScreenManager:
 
 <TopToolbar>:
     id: top_Toolbar
-    right_action_items: [['power', lambda x: root.logOut()]]
-    left_action_items: [['menu', lambda x: print("DUMMY")]]
+    left_action_items: [['menu', lambda x: root.openNavigationDraw()]]
     elevation: 10
+
+
+<previousOrderScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        TopToolbar:
+            pos_hint: {'top': 1}
+
+        ScrollView:
+            MDGridLayout:
+                id: historySummary
+                cols: 1
+                adaptive_height: True
+
+
 
 <HotelScreen>:
     TopToolbar:
@@ -128,15 +180,6 @@ ScreenManager:
         ScrollView:
             MDList:
                 id: toBill_ScrollView
-                #GridLayout:
-                 #   cols: 2
-                  #  id: billDishPrice_scrollView
-                    #TwoLineListItem:
-                    #    id: billDishName_details_id
-                    #    #divider: 'Inset'
-                    #MDLabel:
-                    #    id: billDishPrice_details_id
-                    #    halign: 'center'
 
     GridLayout:
         cols:2

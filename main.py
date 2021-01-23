@@ -10,7 +10,7 @@ from kivymd.uix.behaviors.magic_behavior import MagicBehavior
 from kivymd.uix.card import MDCard
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.toolbar import MDToolbar
-from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget, TwoLineListItem
+from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget, TwoLineListItem, ThreeLineListItem
 from kivymd.toast import toast
 from kivymd.uix.dialog import MDDialog
 from kivymd.uix.button import MDFlatButton
@@ -18,13 +18,16 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.gridlayout import MDGridLayout
 from kivy.base import EventLoop
 from kivymd.uix.picker import MDTimePicker
+from kivymd.uix.navigationdrawer import MDNavigationDrawer
+from kivymd.uix.expansionpanel import MDExpansionPanel, MDExpansionPanelTwoLine
+
 
 Window.size = (360, 600)
 Window.keyboard_anim_args = {'d': 0.2, 't': 'in_out_expo'}
 Window.softinput_mode = 'below_target'
 
 db = mysql.connector.connect(host="bpjum1fu8uithbn7fk2n-mysql.services.clever-cloud.com", user="utt8pcxyfysh9vwz",
-                                  passwd="fFYduFGCjwhnyLrc1hIy", database="bpjum1fu8uithbn7fk2n")
+                                  passwd="fFYduFGCjwhnyLrc1hIy", database="bpjum1fu8uithbn7fk2n", autocommit = True)
 
 username_current = ""
 
@@ -42,12 +45,14 @@ class LogInScreen(Screen):
         local_cursor = db.cursor()
         local_cursor.execute("select * from loginStudent")
         self.result = local_cursor.fetchall()
+        local_cursor.close()
 
 
     def logIn_verify(self):
         if (self.ids.username.text, self.ids.password.text) in self.result:
             self.ids.password.text = ""
-            MDApp.get_running_app().root.current = 'hotel'
+            MDApp.get_running_app().root.ids.master.current = 'hotel'
+
 
         else:
             self.ids.animCard_logIn.shake()
@@ -62,8 +67,59 @@ class LogInScreen(Screen):
 
 
 class TopToolbar(MDToolbar):
+    global username_current
+    def openNavigationDraw(self):
+        MDApp.get_running_app().root.ids.navDrawLbl.text = "  Welcome " + username_current + "!"
+        MDApp.get_running_app().root.ids.nav_drawer.set_state("open")
+
+
+class NavDrawer(MDNavigationDrawer):
+
+    def goToHome(self):
+        MDApp.get_running_app().root.ids.nav_drawer.set_state("close")
+        MDApp.get_running_app().root.ids.master.current = 'hotel'
+
     def logOut(self):
-        MDApp.get_running_app().root.current = 'logIn'
+        MDApp.get_running_app().root.ids.nav_drawer.set_state("close")
+        MDApp.get_running_app().root.ids.master.current = 'logIn'
+
+
+
+class previousOrderScreen(Screen):
+
+    global username_current
+
+    def on_pre_enter(self):
+        db.cmd_reset_connection()
+        MDApp.get_running_app().root.ids.nav_drawer.set_state("close")
+
+        try:
+            cursor = db.cursor()
+            previousOrderSQL_statement = "select * from orderDetailsTimeTable where studentUsername = " + "\"" + username_current + "\""
+            cursor.execute(previousOrderSQL_statement)
+            resultsPreviousOrders = pd.DataFrame(cursor.fetchall()).rename(columns={0: "ordernum", 1: "studentUsername", 2: "hotelName", 3: "timeTakeAway", 4: "totalPay", 5: "orderStatus"}).sort_values(by="timeTakeAway",ascending=False).reset_index(drop=True)
+            cursor.close()
+
+
+            self.ids.historySummary.clear_widgets()
+
+            for i in range(len(resultsPreviousOrders)):
+                expansion = MDExpansionPanel(
+                    content = ThreeLineListItem(
+                        text = "Code :  " + (resultsPreviousOrders.loc[i,"ordernum"][:5] if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else "*****"),
+                        secondary_text = "Total Amount :  \u20B9 " + str(resultsPreviousOrders.loc[i, "totalPay"]),
+                        tertiary_text =  "Order Status :  " + ("Active" if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else "Completed" if resultsPreviousOrders.loc[i, "orderStatus"] == 0 else "Food not collected. Cancelled"),
+                        bg_color = (0,1,0,0.35) if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else (0,0,0,0) if resultsPreviousOrders.loc[i, "orderStatus"] == 0 else (1,0,0,0.5)
+                    ),
+                    panel_cls = MDExpansionPanelTwoLine(
+                        text = resultsPreviousOrders.loc[i, "hotelName"],
+                        secondary_text = str(resultsPreviousOrders.loc[i, "timeTakeAway"])
+                    )
+                )
+                self.ids.historySummary.add_widget(expansion)
+
+        except (KeyError, TypeError):
+            pass
 
 
 class HotelScreen(Screen):
@@ -86,6 +142,7 @@ class HotelScreen(Screen):
         self.hotel_names_spinner = list(pd.DataFrame(self.cursor.fetchall())[0])
         self.ids.hotelNames_spinner.values = self.hotel_names_spinner
         # self.ids.bottomToolbar.title = ""
+        self.cursor.close()
 
     def dish_filler(self, hotel_selected):
         # print(dir(self.ids.list_dish))
@@ -93,9 +150,11 @@ class HotelScreen(Screen):
         self.ids.list_dish.clear_widgets()
         # print("Children after :\t", self.ids.list_dish.children)
         # print(dir(self.ids.list_dish))
+        self.cursor = db.cursor()
         search = "select dish, price from dish where username = \"" + hotel_selected + "\" and available = 1"
         self.cursor.execute(search)
         HotelScreen.dish_available_in_currentSelectedHotel = pd.DataFrame(self.cursor.fetchall()).rename(columns={0: "Dish", 1: "Price"})
+        self.cursor.close()
         for i in range(len(HotelScreen.dish_available_in_currentSelectedHotel)):
             l = IconLeftWidget(icon="minus", on_release=self.minus_dish)
             r = IconRightWidget(icon="plus", on_release=self.plus_dish)
@@ -157,7 +216,7 @@ class HotelScreen(Screen):
 
     def proceed_to_bill(self):
         if self.ids.bottomToolbar.title != "":
-            MDApp.get_running_app().root.current = "bill"
+            MDApp.get_running_app().root.ids.master.current = "bill"
 
     def resetValues(self):
         HotelScreen.student_ordering_list = list()
@@ -206,6 +265,7 @@ class BillScreen(Screen):
         self.ids.billTotalAmountToPay_id.text = "\u20B9 " + str(self.hotel_obj.totalAmount_Order)
         # print("text = ", self.ids.billTotalAmountToPay_id.text)
         # print(self.hotel_obj.totalAmount_Order)
+        self.cursor.close()
 
     def show_time_picker(self):
         # previous_time = datetime.now().time()
@@ -226,6 +286,7 @@ class BillScreen(Screen):
         # print(self.orders_frequency_table)
         orderNum = str(randint(0,99999)) + str(date.today().year) + str(date.today().month) + str(date.today().day)
         # print(orderNum)
+        self.cursor = db.cursor()
         placeOrderStatement = "insert into orderDetailsTimeTable(ordernum, studentUsername, hotelName, timeTakeAway, totalPay, orderStatus) values (%s, %s, %s, %s, %s, %s)"
         placeOrderDetails = (orderNum, username_current, self.hotel_obj.hotel_ordering_currently, datetime.combine(date.today(), self.time_takeAway), self.hotel_obj.totalAmount_Order, True)
         self.cursor.execute(placeOrderStatement, placeOrderDetails)
@@ -237,13 +298,17 @@ class BillScreen(Screen):
 
         placeOrderDishTableStatement = "insert into orderDishTable(ordernum, dish, quantity) values " + ",".join("(%s, %s, %s)" for dummy in self.orders_frequency_table)
         # print(placeOrderDishTableStatement)
-        self.cursor.execute(placeOrderDishTableStatement, placeOrderDishTableDetails)
-        db.commit()
-        self.ids.bill_timeLbl.text = "00:00"
-        self.ids.billConfirmBtn.disabled = True
-        self.hotel_obj.resetValues()
-        MDApp.get_running_app().root.current = 'hotel'
-        Snackbar(text='Order placed').show()
+        if datetime.combine(date.today(), self.time_takeAway) > datetime.now():
+            self.ids.bill_timeLbl.text = "00:00"
+            self.ids.billConfirmBtn.disabled = True
+            self.hotel_obj.resetValues()
+            self.cursor.execute(placeOrderDishTableStatement, placeOrderDishTableDetails)
+            self.cursor.close()
+            db.commit()
+            MDApp.get_running_app().root.ids.master.current = 'hotel'
+            Snackbar(text='Order placed').show()
+        else:
+            Snackbar(text = 'Selecting past time is not valid').show()
 
 
 class studentApp(MDApp):
@@ -254,12 +319,13 @@ class studentApp(MDApp):
 
     def hook_keyboard(self, window, key, *largs):
         if key == 27:
-            if MDApp.get_running_app().root.current == 'hotel':
-                MDApp.get_running_app().root.current = 'logIn'
-            elif MDApp.get_running_app().root.current == 'logIn':
+            if MDApp.get_running_app().root.ids.master.current == 'hotel':
+                MDApp.get_running_app().root.ids.master.current = 'logIn'
+            elif MDApp.get_running_app().root.ids.master.current == 'logIn':
+                db.close()
                 MDApp.get_running_app().stop()
             else:
-                MDApp.get_running_app().root.current = 'hotel'
+                MDApp.get_running_app().root.ids.master.current = 'hotel'
             return True
 
 
