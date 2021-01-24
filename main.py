@@ -1,8 +1,7 @@
 import mysql.connector
 import pandas as pd
-from datetime import date
 from random import randint
-from datetime import datetime
+from datetime import datetime, date
 from kivymd.app import MDApp
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.core.window import Window
@@ -22,7 +21,7 @@ from kivymd.uix.navigationdrawer import MDNavigationDrawer
 from kivymd.uix.expansionpanel import MDExpansionPanel, MDExpansionPanelTwoLine
 
 
-Window.size = (360, 600)
+# Window.size = (360, 600)
 Window.keyboard_anim_args = {'d': 0.2, 't': 'in_out_expo'}
 Window.softinput_mode = 'below_target'
 
@@ -42,6 +41,7 @@ class AnimCard(MagicBehavior, MDCard):
 
 class LogInScreen(Screen):
     def on_pre_enter(self):
+        db.cmd_reset_connection()
         local_cursor = db.cursor()
         local_cursor.execute("select * from loginStudent")
         self.result = local_cursor.fetchall()
@@ -68,6 +68,7 @@ class LogInScreen(Screen):
 
 class TopToolbar(MDToolbar):
     global username_current
+
     def openNavigationDraw(self):
         MDApp.get_running_app().root.ids.navDrawLbl.text = "  Welcome " + username_current + "!"
         MDApp.get_running_app().root.ids.nav_drawer.set_state("open")
@@ -133,7 +134,7 @@ class HotelScreen(Screen):
     bottomAppID = ""
 
     def on_pre_enter(self):
-
+        db.cmd_reset_connection()
         HotelScreen.bottomAppID = self.ids.bottomToolbar
         # print(HotelScreen.bottomAppID)
         self.cursor = db.cursor()
@@ -236,6 +237,7 @@ class BillScreen(Screen):
 
 
     def on_enter(self):
+        db.cmd_reset_connection()
         self.hotel_obj = HotelScreen()
         # self.time_takeAway = None
         self.orders_frequency_table = None
@@ -281,7 +283,7 @@ class BillScreen(Screen):
 
     def placeOrder(self):
         # print(username_current)
-        # print(self.hotel_obj.hotel_ordering_currently)
+        # print("1st line ", self.hotel_obj.hotel_ordering_currently)
         # print(datetime.combine(date.today(), self.time_takeAway))
         # print(self.orders_frequency_table)
         orderNum = str(randint(0,99999)) + str(date.today().year) + str(date.today().month) + str(date.today().day)
@@ -294,17 +296,26 @@ class BillScreen(Screen):
         placeOrderDishTableDetails = []
         for i in self.orders_frequency_table:
             placeOrderDishTableDetails.extend([orderNum, i, self.orders_frequency_table[i]])
+        # print(self.orders_frequency_table)
         # print(placeOrderDishTableDetails)
 
         placeOrderDishTableStatement = "insert into orderDishTable(ordernum, dish, quantity) values " + ",".join("(%s, %s, %s)" for dummy in self.orders_frequency_table)
         # print(placeOrderDishTableStatement)
+        # print("Out if", self.hotel_obj.hotel_ordering_currently)
         if datetime.combine(date.today(), self.time_takeAway) > datetime.now():
             self.ids.bill_timeLbl.text = "00:00"
             self.ids.billConfirmBtn.disabled = True
-            self.hotel_obj.resetValues()
+            # print("Out For",self.hotel_obj.hotel_ordering_currently)
+            for i in self.orders_frequency_table:
+                update_dishOutstanding = "update dish set orderOutStanding = orderOutStanding + %s where dish = %s and username = %s"
+                update_dishOutstanding_details = (str(self.orders_frequency_table[i]), str(i), str(self.hotel_obj.hotel_ordering_currently))
+                # print("in for", self.hotel_obj.hotel_ordering_currently)
+                # print(update_dishOutstanding_details)
+                self.cursor.execute(update_dishOutstanding, update_dishOutstanding_details)
             self.cursor.execute(placeOrderDishTableStatement, placeOrderDishTableDetails)
-            self.cursor.close()
             db.commit()
+            self.cursor.close()
+            self.hotel_obj.resetValues()
             MDApp.get_running_app().root.ids.master.current = 'hotel'
             Snackbar(text='Order placed').show()
         else:
@@ -313,12 +324,16 @@ class BillScreen(Screen):
 
 class studentApp(MDApp):
     global username_current
+
     def build(self):
         self.theme_cls.primary_palette = 'BlueGray'
         EventLoop.window.bind(on_keyboard = self.hook_keyboard)
 
     def hook_keyboard(self, window, key, *largs):
         if key == 27:
+            if MDApp.get_running_app().root.ids.nav_drawer.state == "open":
+                MDApp.get_running_app().root.ids.nav_drawer.set_state("close")
+
             if MDApp.get_running_app().root.ids.master.current == 'hotel':
                 MDApp.get_running_app().root.ids.master.current = 'logIn'
             elif MDApp.get_running_app().root.ids.master.current == 'logIn':
