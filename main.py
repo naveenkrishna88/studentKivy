@@ -9,17 +9,17 @@ from kivymd.uix.behaviors.magic_behavior import MagicBehavior
 from kivymd.uix.card import MDCard
 from kivymd.uix.snackbar import Snackbar
 from kivymd.uix.toolbar import MDToolbar
-from kivymd.uix.list import TwoLineAvatarIconListItem, IconLeftWidget, IconRightWidget, TwoLineListItem, ThreeLineListItem
+from kivymd.uix.list import TwoLineAvatarIconListItem, ThreeLineRightIconListItem, IconLeftWidget, IconRightWidget, TwoLineListItem
 from kivymd.toast import toast
 from kivymd.uix.dialog import MDDialog
-from kivymd.uix.button import MDFlatButton
 from kivymd.uix.label import MDLabel
 from kivymd.uix.gridlayout import MDGridLayout
 from kivy.base import EventLoop
 from kivymd.uix.picker import MDTimePicker
 from kivymd.uix.navigationdrawer import MDNavigationDrawer
+from kivymd.uix.button import MDFlatButton
+from datetime import date, datetime
 from kivymd.uix.expansionpanel import MDExpansionPanel, MDExpansionPanelTwoLine
-
 
 Window.size = (360, 600)
 Window.keyboard_anim_args = {'d': 0.2, 't': 'in_out_expo'}
@@ -28,7 +28,7 @@ Window.softinput_mode = 'below_target'
 db = mysql.connector.connect(host="btyjrjkqioozicbjpsyz-mysql.services.clever-cloud.com", user="utt8pcxyfysh9vwz",passwd="fFYduFGCjwhnyLrc1hIy", database="btyjrjkqioozicbjpsyz", autocommit = True)
 
 username_current = ""
-
+selected_orderNum_to_see = 0
 
 class ScreenManagement(ScreenManager):
     pass
@@ -97,29 +97,69 @@ class previousOrderScreen(Screen):
             cursor = db.cursor()
             previousOrderSQL_statement = "select * from orderDetailsTimeTable where studentUsername = " + "\"" + username_current + "\""
             cursor.execute(previousOrderSQL_statement)
-            resultsPreviousOrders = pd.DataFrame(cursor.fetchall()).rename(columns={0: "ordernum", 1: "studentUsername", 2: "hotelName", 3: "timeTakeAway", 4: "totalPay", 5: "orderStatus"}).sort_values(by="timeTakeAway",ascending=False).reset_index(drop=True)
+            self.resultsPreviousOrders = pd.DataFrame(cursor.fetchall()).rename(columns={0: "ordernum", 1: "studentUsername", 2: "hotelName", 3: "timeTakeAway", 4: "totalPay", 5: "orderStatus"}).sort_values(by="timeTakeAway",ascending=False).reset_index(drop=True)
             cursor.close()
 
 
             self.ids.historySummary.clear_widgets()
 
-            for i in range(len(resultsPreviousOrders)):
-                expansion = MDExpansionPanel(
-                    content = ThreeLineListItem(
-                        text = "Code :  " + (resultsPreviousOrders.loc[i,"ordernum"][:5] if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else "*****"),
-                        secondary_text = "Total Amount :  \u20B9 " + str(resultsPreviousOrders.loc[i, "totalPay"]),
-                        tertiary_text =  "Order Status :  " + ("Active" if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else "Completed" if resultsPreviousOrders.loc[i, "orderStatus"] == 0 else "Food not collected. Cancelled"),
-                        bg_color = (0,1,0,0.35) if resultsPreviousOrders.loc[i, "orderStatus"] == 1 else (0,0,0,0) if resultsPreviousOrders.loc[i, "orderStatus"] == 0 else (1,0,0,0.5)
-                    ),
-                    panel_cls = MDExpansionPanelTwoLine(
-                        text = resultsPreviousOrders.loc[i, "hotelName"],
-                        secondary_text = str(resultsPreviousOrders.loc[i, "timeTakeAway"])
-                    )
-                )
-                self.ids.historySummary.add_widget(expansion)
+            for i in range(len(self.resultsPreviousOrders)):
+                order_history = ThreeLineRightIconListItem(
+                    text = "Code :  " + (self.resultsPreviousOrders.loc[i,"ordernum"][:5] if self.resultsPreviousOrders.loc[i, "orderStatus"] == 1 else "*****"),
+                    secondary_text = "TakeAway Time: " + str(self.resultsPreviousOrders.loc[i, "timeTakeAway"]),
+                    tertiary_text =  "Hotel: " + self.resultsPreviousOrders.loc[i, "hotelName"],
+                    bg_color = (0,1,0,0.25) if self.resultsPreviousOrders.loc[i, "orderStatus"] == 1 else (0,0,0,0) if self.resultsPreviousOrders.loc[i, "orderStatus"] == 0 else (1,0,0,0.25) if self.resultsPreviousOrders.loc[i, "orderStatus"] == -1 else (0,0,1,0.25) )
+                right_icon = IconRightWidget(icon = 'plus', on_release = self.show_previous_order_selected, lbl_txt = str(self.resultsPreviousOrders.loc[i,"ordernum"][:5]) + str(self.resultsPreviousOrders.loc[i, "timeTakeAway"].to_pydatetime().date().year) + str(self.resultsPreviousOrders.loc[i, "timeTakeAway"].to_pydatetime().date().month) + str(self.resultsPreviousOrders.loc[i, "timeTakeAway"].to_pydatetime().date().day))
+                order_history.add_widget(right_icon)
+                self.ids.historySummary.add_widget(order_history)
 
         except (KeyError, TypeError):
             pass
+
+    def show_previous_order_selected(self, instance):
+        global selected_orderNum_to_see
+        selected_orderNum_to_see = instance.lbl_txt
+        MDApp.get_running_app().root.ids.master.current = "orderIndividualDetails"
+
+class previousOrderIndividualDetails(previousOrderScreen):
+
+    global selected_orderNum_to_see
+    def on_pre_enter(self):
+        db.cmd_reset_connection()
+
+        cursor = db.cursor()
+        cursor.execute("select orderStatus from orderDetailsTimeTable where ordernum = %s", (selected_orderNum_to_see,))
+        orderStatus = cursor.fetchall()[0][0]
+
+        self.ids.comment.text = "Order Status :  " + ("Active" if orderStatus == 1 else "Completed" if orderStatus == 0 else "Food not collected. Cancelled" if orderStatus == -1 else "Cancelled by you.")
+        self.ids.deleteOrderBtn.disabled = False if orderStatus == 1 else True
+
+        fetchOrder_statement = "select orderDishTable.dish, orderDishTable.quantity, dish.price from orderDishTable left join dish on dish.dish = orderDishTable.dish where orderDishTable.ordernum in (select ordernum from orderDetailsTimeTable where ordernum = %s);"
+        cursor.execute(fetchOrder_statement, (selected_orderNum_to_see,))
+        orderDetails = pd.DataFrame(cursor.fetchall()).rename(
+            columns={0: 'Dish', 1: 'Quantity', 2: 'Price'}).reset_index(drop=True)
+        cursor.close()
+
+        totalPay = 0
+        self.ids.previous_order_dish_list.clear_widgets()
+        for i in range(len(orderDetails)):
+            self.orderDetailsItem = MDGridLayout(cols=4)
+            self.orderDetailsItem.add_widget(MDLabel(text=orderDetails.loc[i, 'Dish']))
+            self.orderDetailsItem.add_widget(MDLabel(text=str(orderDetails.loc[i, 'Quantity'])))
+            self.orderDetailsItem.add_widget(MDLabel(text="\u20B9" + str(orderDetails.loc[i, 'Price'])))
+            self.orderDetailsItem.add_widget(MDLabel(
+                text="\u20B9" + str(orderDetails.loc[i, 'Quantity'] * orderDetails.loc[i, 'Price'])))
+            self.ids.previous_order_dish_list.add_widget(self.orderDetailsItem)
+            totalPay += orderDetails.loc[i, 'Quantity'] * orderDetails.loc[i, 'Price']
+
+        self.ids.bill_totalPay.text = "Total:    \u20B9" + str(totalPay)
+
+    def deleteOrder(self):
+        cursor = db.cursor()
+        cursor.execute("update orderDetailsTimeTable set orderStatus = 2 where ordernum = %s", (selected_orderNum_to_see,))
+        db.commit()
+        Snackbar(text="Order cancelled").show()
+        MDApp.get_running_app().root.ids.master.current = 'hotel'
 
 
 class HotelScreen(Screen):
@@ -202,7 +242,7 @@ class HotelScreen(Screen):
             self.dialog.dismiss()
 
     def proceed_to_bill(self):
-        if self.ids.bottomToolbar.title != "":
+        if (self.ids.bottomToolbar.title != "") and (HotelScreen.totalAmount_Order !=0) :
             MDApp.get_running_app().root.ids.master.current = "bill"
 
     def resetValues(self):
@@ -293,6 +333,8 @@ class studentApp(MDApp):
             elif MDApp.get_running_app().root.ids.master.current == 'logIn':
                 db.close()
                 MDApp.get_running_app().stop()
+            elif MDApp.get_running_app().root.ids.master.current == 'orderIndividualDetails':
+                MDApp.get_running_app().root.ids.master.current = 'history'
             else:
                 MDApp.get_running_app().root.ids.master.current = 'hotel'
             return True
