@@ -10,6 +10,8 @@ Screen:
                 name: "bill"
             previousOrderScreen:
                 name: "history"
+            previousOrderIndividualDetails:
+                name: "orderIndividualDetails"
 
         NavDrawer:
             id: nav_drawer
@@ -75,7 +77,7 @@ Screen:
                 MDTextField:
                     id: username
                     hint_text: "Username"
-                    helper_text: "case sensitive"
+                    helper_text: "Username is case sensitive"
                     helper_text_mode: 'on_focus'
                     required: True
                     icon_right: 'account'
@@ -118,11 +120,56 @@ Screen:
             pos_hint: {'top': 1}
 
         ScrollView:
-            MDGridLayout:
+            MDList:
                 id: historySummary
                 cols: 1
                 adaptive_height: True
 
+<previousOrderIndividualDetails>:
+    TopToolbar:
+        pos_hint: {'top': 1}
+
+    BoxLayout:
+        padding: 15
+        size_hint_x: 0.9
+        pos_hint: {'center_x': 0.5, 'center_y': 0.825}
+
+        MDLabel:
+            id: bill_totalPay
+            font_style: 'H6'
+
+    GridLayout:
+        pos_hint: {'center_x': 0.5, 'center_y': 0.7}
+        cols: 4
+        padding: 20
+        MDLabel:
+            text: 'Dish'
+        MDLabel:
+            text: 'Qty'
+        MDLabel:
+            text: 'Rate'
+        MDLabel:
+            text: 'Price'
+
+    ScrollView:
+        pos_hint:{'center_x': 0.5, 'center_y': 0.4}
+        size_hint:(1, 0.5)
+        MDList:
+            md_bg_color: (153/255,153/255,153/255,0.5)
+            id: previous_order_dish_list
+
+    MDLabel:
+        id: comment
+        pos_hint:{'center_y': 0.1, 'x': 0.1}
+
+    MDFillRoundFlatButton:
+        id: deleteOrderBtn
+        text: 'Delete Order'
+        md_bg_color: (0,0.75,0.25,1)
+        size_hint_x: 1.25
+        pos_hint: {'center_x': 0.5}
+        on_release: root.deleteOrder()
+        disabled: True
 
 
 <HotelScreen>:
@@ -213,4 +260,3 @@ Screen:
         pos_hint: {'center_x': 0.5}
         on_release: root.placeOrder()
         disabled: True
-        
